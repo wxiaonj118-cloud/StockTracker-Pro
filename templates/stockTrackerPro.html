@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StockTrack Pro</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Add Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        /* CRITICAL FIX: Ensure search-container has proper positioning */
+        .search-container {
+            position: relative !important;
+            width: 100% !important;
+        }
+        
+        /* Ensure autocomplete dropdown is properly positioned */
+        #autocompleteResults.autocomplete-results {
+            position: absolute !important;
+            top: 100% !important;
+            left: 0 !important;
+            right: 0 !important;
+            z-index: 1000 !important;
+            margin-top: 5px !important;
+        }
+        
+        /* Fix for dropdown closing behavior */
+        .autocomplete-item {
+            cursor: pointer !important;
+            position: relative !important;
+            z-index: 1001 !important;
+        }
+        
+        /* Loading spinner animation */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Style for the chart section */
+        .chart-section {
+            margin-top: 50px;
+            background: var(--apple-card-bg);
+            border-radius: var(--apple-radius);
+            padding: 40px;
+            box-shadow: var(--apple-shadow);
+            border: 1px solid var(--apple-border);
+        }
+        
+        .chart-section h3 {
+            font-size: 1.75rem;
+            font-weight: 600;
+            color: var(--apple-text);
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        
+        .time-period-buttons {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        
+        .time-period-btn {
+            padding: 12px 24px;
+            background: var(--apple-light-gray);
+            color: var(--apple-text);
+            border: 2px solid var(--apple-border);
+            border-radius: var(--apple-radius-sm);
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--apple-transition);
+        }
+        
+        .time-period-btn:hover {
+            background: #e5e5e7;
+            border-color: #c7c7cc;
+        }
+        
+        .time-period-btn.active {
+            background: var(--apple-blue);
+            color: white;
+            border-color: var(--apple-blue);
+        }
+        
+        .chart-container {
+            position: relative;
+            height: 500px;
+            width: 100%;
+        }
+        
+        /* Responsive chart */
+        @media (max-width: 768px) {
+            .chart-section {
+                padding: 25px;
+                margin-top: 30px;
+            }
+            
+            .chart-container {
+                height: 350px;
+            }
+            
+            .time-period-buttons {
+                gap: 10px;
+            }
+            
+            .time-period-btn {
+                padding: 10px 20px;
+                font-size: 0.9rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="header-icon">
+                <i class="fas fa-chart-line"></i>
+            </div>
+            <h1>StockTrack Pro</h1>
+            <p class="header-subtitle">Real-time market data with Apple-inspired design</p>
+        </header>
+
+<!-- Market Indices Dashboard -->
+<section class="indices-dashboard" id="indicesDashboard">
+    <div class="container">
+        <h3><i class="fas fa-chart-line"></i> Major US Indices</h3>
+        <div class="indices-grid" id="indicesGrid">
+            <div class="loading-indices">
+                <div class="spinner-small"></div>
+                <p>Loading market data...</p>
+            </div>
+        </div>
+    </div>
+</section>
+      
+        <main class="main-content">
+            <div class="control-panel">
+                <div class="form-group">
+                    <label for="stockRegion">Market Region</label>
+                    <select id="stockRegion">
+                        <option value="US">United States (NYSE, NASDAQ)</option>
+                        <!-- Other markets hidden until API supports them -->
+                        <!-- <option value="HK">Hong Kong (HKEX)</option> -->
+                        <!-- <option value="TW">Taiwan (TWSE)</option> -->
+                        <!-- <option value="CN">China (SSE, SZSE)</option> -->
+                    </select>
+                    <div style="margin-top: 8px; font-size: 0.9rem; color: #86868b;">
+                        Note: Only US market is currently available.
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label for="symbolSearch">Search Company or Symbol</label>
+                    <!-- CRITICAL: search-container wrapper with proper styling -->
+                    <div class="search-container" style="position: relative; width: 100%;">
+                        <div class="input-group">
+                            <input type="text" 
+                                   id="symbolSearch" 
+                                   placeholder="e.g., Apple Inc. or AAPL"
+                                   autocomplete="off">
+                            <input type="hidden" id="stockSymbol">
+                            <button id="fetchBtn">
+                                <i class="fas fa-search"></i>
+                                <span>Get Quote</span>
+                            </button>
+                        </div>
+                        <!-- Autocomplete dropdown -->
+                        <div id="autocompleteResults" class="autocomplete-results"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Loading indicator -->
+            <div id="loading" style="display: none; margin: 40px 0; text-align: center;">
+                <div style="width: 60px; height: 60px; border: 4px solid #f5f5f7; border-top: 4px solid #0071e3; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p style="color: #86868b; font-size: 1.125rem;">Fetching real-time data...</p>
+            </div>
+            
+            <!-- Results will appear here -->
+            <div id="resultContainer" class="result-container"></div>
+            
+            <!-- Chart Section - ADDED FOR HISTORICAL DATA -->
+            <div class="chart-section" id="chartSection" style="display: none;">
+                <h3><i class="fas fa-chart-line"></i> Historical Price Chart</h3>
+                
+                <!-- Time Period Buttons -->
+                <div class="time-period-buttons">
+                    <button class="time-period-btn active" data-limit="30">1 Month</button>
+                    <button class="time-period-btn" data-limit="90">3 Months</button>
+                    <button class="time-period-btn" data-limit="180">6 Months</button>
+                    <button class="time-period-btn" data-limit="365">1 Year</button>
+                    <button class="time-period-btn" data-limit="730">2 Years</button>
+                </div>
+                
+                <!-- Chart Canvas Container -->
+                <div class="chart-container">
+                    <canvas id="stockChart"></canvas>
+                </div>
+                
+                <!-- Chart Info/Notes -->
+                <div style="margin-top: 25px; padding-top: 20px; border-top: 1px solid var(--apple-border);">
+                    <p style="color: var(--apple-text-secondary); font-size: 0.9rem; line-height: 1.5;">
+                        <i class="fas fa-info-circle" style="margin-right: 8px;"></i>
+                        This chart displays daily closing prices. Click on the time period buttons above to view different historical ranges. 
+                        Data is provided by iTick API with End-of-Day (EOD) historical data.
+                    </p>
+                </div>
+            </div>
+	<!-- NEW: AI Insights Section -->
+	<div class="ai-insights-section" id="aiInsightsSection" style="display: none;">
+    	<div class="ai-header">
+        <h3><i class="fas fa-brain"></i> AI Market Analysis</h3>
+        <button class="ai-toggle-btn" id="aiToggleBtn">
+            <span>Show AI Analysis</span>
+            <i class="fas fa-chevron-down"></i>
+        </button>
+    </div>
+    
+    <div class="ai-content" id="aiContent" style="display: none;">
+        <div class="loading-ai" id="loadingAI">
+            <div class="spinner-small"></div>
+            <p>Generating AI-powered analysis...</p>
+        </div>
+        
+        <!-- AI insights will be inserted here -->
+        <div class="ai-insights-grid" id="aiInsightsGrid" style="display: none;"></div>
+        
+        <!-- Technical indicators summary -->
+        <div class="ai-technical-info" id="aiTechnicalInfo" style="display: none;"></div>
+    </div>
+    
+    <!-- Cost notice (optional but helpful) -->
+    <div class="ai-cost-notice">
+        <i class="fas fa-coins"></i>
+        <span>Each analysis costs ~$0.00021 in API tokens</span>
+    </div>
+</div>
+	
+        </main>
+        
+        <footer class="footer">
+            <p>StockTrack Pro • Real-time market data powered by iTick API</p>
+            <p>© 2024 • Designed with Apple-inspired aesthetics</p>
+        </footer>
+    </div>
+    
+    <!-- Load JavaScript LAST -->
+    <script src="{{ url_for('static', filename='js/script.js') }}"></script>
+</body>
+</html>
