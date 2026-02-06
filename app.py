@@ -3,11 +3,18 @@ from flask_cors import CORS
 import requests
 import os
 import pandas as pd
-import talib
+import numpy as np
 from openai import OpenAI
 from dotenv import load_dotenv
 import json
 from datetime import datetime
+# Check for TA-Lib and provide a fallback
+try:
+    import talib
+    TALIB_AVAILABLE = True
+except ImportError:
+    TALIB_AVAILABLE = False
+    print("⚠️  WARNING: TA-Lib not available. Using simple fallback calculations.")
 
 # ========== 1. LOAD CONFIGURATION ==========
 load_dotenv()
@@ -27,16 +34,20 @@ if not DEEPSEEK_API_KEY:
 
 # Initialize DeepSeek Client (if key is available)
 deepseek_client = None
-if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "your_deepseek_api_key_here":
-    try:
-        deepseek_client = OpenAI(
-            api_key=DEEPSEEK_API_KEY,
-            base_url="https://api.deepseek.com"
-        )
-        print("✅ DeepSeek AI client initialized successfully.")
-    except Exception as e:
-        print(f"❌ Failed to initialize DeepSeek client: {e}")
-        deepseek_client = None
+print("⚠️  AI Analysis temporarily disabled for deployment. Will fix after successful deploy.")
+#if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "your_deepseek_api_key_here":
+#    try:
+#        # Simplified initialization for openai==1.12.0
+#        deepseek_client = OpenAI(
+#            api_key=DEEPSEEK_API_KEY,
+#            base_url="https://api.deepseek.com"
+#        )
+#        # Test the connection with a simple call
+#        deepseek_client.models.list()  # This will fail if connection is bad
+#        print("✅ DeepSeek AI client initialized successfully.")
+#    except Exception as e:
+#        print(f"❌ Failed to initialize DeepSeek client: {e}")
+#        deepseek_client = None
 
 # ========== 2. INITIALIZE FLASK APP ==========
 app = Flask(__name__)
@@ -75,25 +86,47 @@ def calculate_technical_indicators(historical_df, current_price):
         return None
     
     try:
-        # Ensure we have numeric data
-        closes = pd.to_numeric(historical_df['c'], errors='coerce').values
+        # Ensure we have numeric data for the 'close' column
+        closes_series = pd.to_numeric(historical_df['c'], errors='coerce')
+        closes = closes_series.values
         
-        # Calculate indicators using TA-Lib
         indicators = {}
         
-        # Moving Averages
-        indicators['ma_20'] = talib.SMA(closes, timeperiod=20)[-1] if len(closes) >= 20 else None
-        indicators['ma_50'] = talib.SMA(closes, timeperiod=50)[-1] if len(closes) >= 50 else None
-        indicators['ma_200'] = talib.SMA(closes, timeperiod=200)[-1] if len(closes) >= 200 else None
+        # --- MOVING AVERAGES ---
+        if TALIB_AVAILABLE:
+            # Use TA-Lib if available
+            indicators['ma_20'] = talib.SMA(closes, timeperiod=20)[-1] if len(closes) >= 20 else None
+            indicators['ma_50'] = talib.SMA(closes, timeperiod=50)[-1] if len(closes) >= 50 else None
+            indicators['ma_200'] = talib.SMA(closes, timeperiod=200)[-1] if len(closes) >= 200 else None
+        else:
+            # Fallback: Use pandas rolling mean
+            indicators['ma_20'] = float(closes_series.rolling(window=20).mean().iloc[-1]) if len(closes) >= 20 else None
+            indicators['ma_50'] = float(closes_series.rolling(window=50).mean().iloc[-1]) if len(closes) >= 50 else None
+            indicators['ma_200'] = float(closes_series.rolling(window=200).mean().iloc[-1]) if len(closes) >= 200 else None
         
-        # RSI (Relative Strength Index)
-        indicators['rsi'] = talib.RSI(closes, timeperiod=14)[-1] if len(closes) >= 14 else None
+        # --- RSI (Relative Strength Index) ---
+        if TALIB_AVAILABLE:
+            indicators['rsi'] = talib.RSI(closes, timeperiod=14)[-1] if len(closes) >= 14 else None
+        else:
+            # Fallback: Simple RSI approximation
+            if len(closes) >= 14:
+                # Calculate price changes
+                deltas = np.diff(closes[-15:])  # Get last 15 closes to calculate 14 periods of change
+                # Separate gains and losses
+                gains = deltas[deltas > 0].sum() / 14
+                losses = -deltas[deltas < 0].sum() / 14
+                if losses != 0:
+                    rs = gains / losses
+                    indicators['rsi'] = 100 - (100 / (1 + rs))
+                else:
+                    indicators['rsi'] = 100  # If there's no loss, RSI is 100
+            else:
+                indicators['rsi'] = None
         
-        # Volatility (Standard Deviation of recent price changes)
+        # --- VOLATILITY & PRICE LEVELS (Same for both methods) ---
         historical_df['returns'] = pd.to_numeric(historical_df['c']).pct_change()
         indicators['volatility_30d'] = historical_df['returns'].tail(30).std() * (252 ** 0.5)  # Annualized
         
-        # Price levels
         indicators['high_52w'] = pd.to_numeric(historical_df['h']).max()
         indicators['low_52w'] = pd.to_numeric(historical_df['l']).min()
         
@@ -113,7 +146,7 @@ def calculate_technical_indicators(historical_df, current_price):
             
         # Round values for readability
         for key in ['ma_20', 'ma_50', 'ma_200', 'rsi', 'volatility_30d', 'high_52w', 'low_52w', 'current_price']:
-            if indicators[key] is not None:
+            if indicators.get(key) is not None:
                 indicators[key] = round(float(indicators[key]), 2)
         
         return indicators

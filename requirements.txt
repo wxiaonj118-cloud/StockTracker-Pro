@@ -14,7 +14,7 @@ python-dateutil==2.8.2
 six==1.16.0
 
 # ===== API CLIENTS & REQUESTS =====
-openai==1.12.0
+openai==1.14.0
 requests==2.31.0
 urllib3==2.0.7
 certifi==2023.7.22
@@ -27,9 +27,6 @@ flask-cors==4.0.0
 
 # ===== PRODUCTION SERVER =====
 gunicorn==21.2.0
-
-# ===== TECHNICAL ANALYSIS =====
-TA-Lib==0.6.8
 
 # ===== SUPPORTING UTILITIES =====
 tzdata==2023.3
