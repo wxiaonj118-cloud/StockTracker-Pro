@@ -2,8 +2,15 @@
 // Wait for the DOM to be fully loaded before accessing elements
 document.addEventListener('DOMContentLoaded', function() {
     // ==================== CONFIGURATION ====================
-    // Your Flask backend URL (running locally)
-    const BACKEND_URL = 'http://127.0.0.1:5000';
+    // DYNAMIC BACKEND URL: Automatically detect environment
+    // - Local development: 'http://127.0.0.1:5000' or 'http://localhost:5000'
+    // - Production: Use relative paths (empty string)
+    const isLocalhost = window.location.hostname === 'localhost' || 
+                        window.location.hostname === '127.0.0.1';
+    const BACKEND_URL = isLocalhost ? 'http://127.0.0.1:5000' : '';
+    
+    console.log(`Environment: ${isLocalhost ? 'Development' : 'Production'}`);
+    console.log(`Backend URL: ${BACKEND_URL || 'Relative paths (production)'}`);
 
     // ==================== GET DOM ELEMENTS ====================
     const regionSelect = document.getElementById('stockRegion');
@@ -92,7 +99,7 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Call your secure Flask backend route
+        // FIXED: Use dynamic backend URL
         const url = `${BACKEND_URL}/api/search/${encodeURIComponent(searchTerm)}`;
 
         try {
@@ -149,7 +156,7 @@ document.addEventListener('DOMContentLoaded', function() {
         hideChartSection(); // Hide chart while loading
 
         try {
-            // Call YOUR Flask backend quote endpoint
+            // FIXED: Use dynamic backend URL
             const response = await fetch(`${BACKEND_URL}/api/stock/${region}/${symbol}`);
             const result = await response.json();
 
@@ -163,7 +170,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
         } catch (error) {
             loadingDiv.style.display = 'none';
-            displayError(`Network Error: Could not connect to the server. Please ensure your Flask backend is running at <strong>${BACKEND_URL}</strong>. <br><br>Error details: ${error.message}`);
+            displayError(`Network Error: Could not connect to the server. Please ensure your Flask backend is running at <strong>${BACKEND_URL || 'the same domain'}</strong>. <br><br>Error details: ${error.message}`);
             console.error('Fetch error:', error);
         }
     }
@@ -244,7 +251,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showChartSection(true);
 
         try {
-            // 3. Pass the signal to the fetch call
+            // 3. FIXED: Use dynamic backend URL
             const response = await fetch(`${BACKEND_URL}/api/historical/US/${symbol}?limit=${limit}&kType=8`, { signal });
             const result = await response.json();
 
@@ -472,7 +479,7 @@ document.addEventListener('DOMContentLoaded', function() {
             stockChartInstance = null;
         }
         currentSymbol = null;
-	hideAIInsightsSection(); //Hide AI section too
+	    hideAIInsightsSection(); //Hide AI section too
     }
 
     function displayChartError(message) {
@@ -514,6 +521,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!indicesGrid) return;
         
         try {
+            // FIXED: Use dynamic backend URL
             const response = await fetch(`${BACKEND_URL}/api/indices`);
             const result = await response.json();
             
@@ -713,6 +721,7 @@ async function fetchAIAnalysis(symbol) {
         if (aiInsightsGrid) aiInsightsGrid.style.display = 'none';
         if (aiTechnicalInfo) aiTechnicalInfo.style.display = 'none';
         
+        // FIXED: Use dynamic backend URL
         const response = await fetch(`${BACKEND_URL}/api/analyze/${region}/${symbol}`);
         const result = await response.json();
         
