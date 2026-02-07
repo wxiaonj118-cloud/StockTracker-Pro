@@ -34,20 +34,16 @@ if not DEEPSEEK_API_KEY:
 
 # Initialize DeepSeek Client (if key is available)
 deepseek_client = None
-print("⚠️  AI Analysis temporarily disabled for deployment. Will fix after successful deploy.")
-#if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "your_deepseek_api_key_here":
-#    try:
-#        # Simplified initialization for openai==1.12.0
-#        deepseek_client = OpenAI(
-#            api_key=DEEPSEEK_API_KEY,
-#            base_url="https://api.deepseek.com"
-#        )
-#        # Test the connection with a simple call
-#        deepseek_client.models.list()  # This will fail if connection is bad
-#        print("✅ DeepSeek AI client initialized successfully.")
-#    except Exception as e:
-#        print(f"❌ Failed to initialize DeepSeek client: {e}")
-#        deepseek_client = None
+if DEEPSEEK_API_KEY and DEEPSEEK_API_KEY != "your_deepseek_api_key_here":
+    try:
+        deepseek_client = OpenAI(
+            api_key=DEEPSEEK_API_KEY,
+            base_url="https://api.deepseek.com"
+        )
+        print("✅ DeepSeek AI client initialized successfully.")
+    except Exception as e:
+        print(f"❌ Failed to initialize DeepSeek client: {e}")
+        deepseek_client = None
 
 # ========== 2. INITIALIZE FLASK APP ==========
 app = Flask(__name__)
